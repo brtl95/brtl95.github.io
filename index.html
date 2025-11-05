@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POD Generator - Multi-File</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --bg-main-gradient-start: #667eea;
+            --bg-main-gradient-end: #764ba2;
+            --bg-container: white;
+            --bg-section-hover: #f8f9ff;
+            --bg-input: white;
+            --bg-btn-secondary: #f0f0f0;
+            --bg-btn-secondary-hover: #e0e0e0;
+            --bg-status-success: #d4edda;
+            --bg-status-error: #f8d7da;
+            --bg-status-info: #d1ecf1;
+            --bg-status-warning: #fff3cd;
+
+            --text-primary: #333;
+            --text-secondary: #555;
+            --text-on-primary-bg: white;
+            --text-btn-secondary: #333;
+            --text-status-success: #155724;
+            --text-status-error: #721c24;
+            --text-status-info: #0c5460;
+            --text-status-warning: #856404;
+
+            --border-color: #e0e0e0;
+            --border-color-focus: #667eea;
+            --border-color-success: #c3e6cb;
+            --border-color-error: #f5c6cb;
+            --border-color-info: #bee5eb;
+            --border-color-warning: #ffeaa7;
+
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --shadow-color-focus: rgba(102, 126, 234, 0.1);
+            --shadow-color-hover: rgba(102, 126, 234, 0.4);
+        }
+
+        body[data-theme="dark"] {
+            --bg-main-gradient-start: #1d2b64;
+            --bg-main-gradient-end: #2c3e50;
+            --bg-container: #282c34;
+            --bg-section-hover: #3a4049;
+            --bg-input: #3a4049;
+            --bg-btn-secondary: #4a5058;
+            --bg-btn-secondary-hover: #5a6068;
+            --bg-status-success: #2a4b37;
+            --bg-status-error: #5a2c33;
+            --bg-status-info: #2a4a54;
+            --bg-status-warning: #5a4c2a;
+
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-on-primary-bg: white;
+            --text-btn-secondary: #e0e0e0;
+            --text-status-success: #a4d7b3;
+            --text-status-error: #f3b5bd;
+            --text-status-info: #a1dcf1;
+            --text-status-warning: #ffeaa7;
+
+            --border-color: #4a5058;
+            --border-color-focus: #8a9ff0;
+            --border-color-success: #4a6b57;
+            --border-color-error: #8a4c53;
+            --border-color-info: #4a6a74;
+            --border-color-warning: #8a6c4a;
+
+            --shadow-color: rgba(0, 0, 0, 0.6);
+            --shadow-color-focus: rgba(138, 159, 240, 0.2);
+            --shadow-color-hover: rgba(138, 159, 240, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-main-gradient-start) 0%, var(--bg-main-gradient-end) 100%);
+            min-height: 100vh;
+            padding: 20px;
+            transition: background 0.3s ease;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--bg-container);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px var(--shadow-color);
+            overflow: hidden;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-main-gradient-start) 0%, var(--bg-main-gradient-end) 100%);
+            color: var(--text-on-primary-bg);
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--border-color-focus);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 1.2em;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .input-group input[type="text"],
+        .input-group input[type="file"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+            background-color: var(--bg-input);
+            color: var(--text-primary);
+        }
+
+        .input-group input[type="text"]:focus,
+        .input-group input[type="file"]:focus {
+            outline: none;
+            border-color: var(--border-color-focus);
+            box-shadow: 0 0 0 3px var(--shadow-color-focus);
+        }
+        
+        .input-note {
+            font-size: 0.8em; 
+            color: var(--text-secondary); 
+            margin-top: 5px;
+        }
+
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--bg-main-gradient-start) 0%, var(--bg-main-gradient-end) 100%);
+            color: var(--text-on-primary-bg);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--shadow-color-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .deposits-table-container {
+            overflow-x: auto;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .deposits-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .deposits-table thead {
+            background: linear-gradient(135deg, var(--bg-main-gradient-start) 0%, var(--bg-main-gradient-end) 100%);
+            color: var(--text-on-primary-bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .deposits-table th,
+        .deposits-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .deposits-table tbody tr:hover {
+            background: var(--bg-section-hover);
+        }
+
+        .deposits-table th {
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .keyword-search {
+            background: var(--bg-section-hover);
+            padding: 25px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+        }
+        
+        .keyword-search p {
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .keyword-search-input {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-top: 15px;
+        }
+
+        .keyword-search-input > div {
+            flex: 1;
+        }
+
+        .status-message {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+
+        .status-success { background: var(--bg-status-success); color: var(--text-status-success); border: 1px solid var(--border-color-success); }
+        .status-error { background: var(--bg-status-error); color: var(--text-status-error); border: 1px solid var(--border-color-error); }
+        .status-info { background: var(--bg-status-info); color: var(--text-status-info); border: 1px solid var(--border-color-info); }
+        .status-warning { background: var(--bg-status-warning); color: var(--text-status-warning); border: 1px solid var(--border-color-warning); }
+
+        .generated-pdfs { margin-top: 20px; }
+        .pdf-item {
+            background: var(--bg-section-hover);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border-color);
+        }
+        .pdf-item-name { font-weight: 600; color: var(--text-primary); }
+        .pdf-item-info { font-size: 0.85em; color: var(--text-secondary); margin-top: 5px; }
+        .hidden { display: none; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Dark Mode Toggle Switch */
+        .theme-switch-wrapper {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .theme-switch { display: inline-block; height: 24px; position: relative; width: 50px; }
+        .theme-switch input { display:none; }
+        .slider { background-color: #ccc; bottom: 0; cursor: pointer; left: 0; position: absolute; right: 0; top: 0; transition: .4s; border-radius: 34px; }
+        .slider:before { background-color: #fff; bottom: 4px; content: ""; height: 16px; left: 4px; position: absolute; transition: .4s; width: 16px; border-radius: 50%; }
+        input:checked + .slider { background: linear-gradient(135deg, var(--bg-main-gradient-start) 0%, var(--bg-main-gradient-end) 100%); }
+        input:checked + .slider:before { transform: translateX(26px); }
+        .theme-switch-wrapper span { margin-right: 10px; color: var(--text-on-primary-bg); font-weight: 500; font-size: 0.9em; }
+    </style>
+</head>
+<body data-theme="light">
+    <div class="container">
+        <div class="header">
+            <div class="theme-switch-wrapper">
+                <span>Dark Mode</span>
+                <label class="theme-switch" for="darkModeToggle">
+                    <input type="checkbox" id="darkModeToggle" />
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <h1>📊 POD Generator</h1>
+            <p>Proof of Deposit PDF Generator - Client-Side Processing</p>
+        </div>
+
+        <div class="content">
+            <!-- Step 1: File Upload -->
+            <div class="section" id="step1">
+                <h2 class="section-title">
+                    <span class="icon">📁</span>
+                    Step 1: Upload Excel File(s)
+                </h2>
+                <div class="input-group">
+                    <label for="excelFile">Select one or more Excel files containing Asset Summary and Transaction sheets</label>
+                    <input type="file" id="excelFile" accept=".xlsx,.xls" multiple>
+                    <p class="input-note">Note: Selecting new file(s) will reset the application.</p>
+                </div>
+                <div class="input-group">
+                    <label for="clientName">Client Identifier (for PDF naming)</label>
+                    <input type="text" id="clientName" placeholder="e.g., JohnDoe">
+                </div>
+                <button class="btn btn-primary" id="processBtn" onclick="processExcel()">
+                    <span>Process Excel File(s)</span>
+                </button>
+                <div id="step1Messages"></div>
+            </div>
+
+            <!-- Step 2: View Deposits -->
+            <div class="section hidden" id="step2">
+                <h2 class="section-title">
+                    <span class="icon">💰</span>
+                    Step 2: All Detected Deposits (Sorted High to Low)
+                </h2>
+                <div id="depositsTableContainer"></div>
+            </div>
+
+            <!-- Step 3: Generate PDFs -->
+            <div class="section hidden" id="step3">
+                <h2 class="section-title">
+                    <span class="icon">🔍</span>
+                    Step 3: Search & Generate POD PDFs
+                </h2>
+                <div class="keyword-search">
+                    <p>
+                        Enter keywords to search in transaction descriptions. Each search will generate a single PDF with matching deposits, sectioned by the source file.
+                    </p>
+                    <div class="keyword-search-input">
+                        <div>
+                            <label for="keywordInput">Keyword</label>
+                            <input type="text" id="keywordInput" placeholder="e.g., PAYROLL, DEPOSIT, etc.">
+                        </div>
+                        <button class="btn btn-primary" onclick="generatePOD()">
+                            <span>Generate PDF</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="step3Messages"></div>
+                <div class="generated-pdfs" id="generatedPdfsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state variables
+        let assetSummaryDataStore = [];
+        let allDepositsData = [];
+        let fileNamesStore = [];
+        let clientNameGlobal = '';
+        let pdfCounter = 1;
+
+        // Constants
+        const ASSET_SUMMARY_SHEET = 'Asset Summary';
+        const REQUIRED_ASSET_PDF_COLS = ['Institution Name', 'Account Mask', 'Account Name', 'Names', 'Addresses', 'Emails'];
+        const ASSET_HEADER_CRITERIA = ['Account Mask', 'Account Name'];
+        const TRANSACTION_HEADER_CRITERIA = ['Date', 'Amount'];
+        const REQUIRED_POD_PDF_COLS = ['Date', 'Amount', 'ISO currency code', 'Name', 'Original description', 'Transaction id'];
+
+        function showMessage(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `status-message status-${type}`;
+            div.textContent = message;
+            container.appendChild(div);
+            setTimeout(() => div.remove(), 5000);
+        }
+        
+        function resetApplication() {
+            assetSummaryDataStore = [];
+            allDepositsData = [];
+            fileNamesStore = [];
+            clientNameGlobal = '';
+            pdfCounter = 1;
+
+            document.getElementById('clientName').value = '';
+            document.getElementById('keywordInput').value = '';
+
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('step3').classList.add('hidden');
+
+            document.getElementById('depositsTableContainer').innerHTML = '';
+            document.getElementById('generatedPdfsList').innerHTML = '';
+            document.getElementById('step1Messages').innerHTML = '';
+            document.getElementById('step3Messages').innerHTML = '';
+            
+            const processBtn = document.getElementById('processBtn');
+            processBtn.disabled = false;
+            processBtn.innerHTML = '<span>Process Excel File(s)</span>';
+            
+            console.log('Application has been reset for new file selection.');
+            showMessage('step1Messages', 'Ready for new file(s). Enter Client Identifier and click Process.', 'info');
+        }
+
+        function findHeaderRow(sheet, criteria) {
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            const criteriaLower = criteria.map(c => c.toLowerCase().trim());
+            
+            for (let row = range.s.r; row <= Math.min(range.s.r + 100, range.e.r); row++) {
+                let rowStr = '';
+                for (let col = range.s.c; col <= range.e.c; col++) {
+                    const cell = sheet[XLSX.utils.encode_cell({r: row, c: col})];
+                    if (cell && cell.v) rowStr += String(cell.v).toLowerCase() + ' ';
+                }
+                if (criteriaLower.every(crit => rowStr.includes(crit))) return row;
+            }
+            return null;
+        }
+
+        function readSheetWithHeader(sheet, headerRow) {
+            if (headerRow === null) return null;
+            const range = XLSX.utils.decode_range(sheet['!ref']);
+            const headers = [];
+            for (let col = range.s.c; col <= range.e.c; col++) {
+                const cell = sheet[XLSX.utils.encode_cell({r: headerRow, c: col})];
+                headers.push(cell && cell.v ? String(cell.v).trim() : `Column${col}`);
+            }
+            const data = [];
+            for (let row = headerRow + 1; row <= range.e.r; row++) {
+                const rowData = {};
+                let hasData = false;
+                for (let col = range.s.c; col <= range.e.c; col++) {
+                    const cell = sheet[XLSX.utils.encode_cell({r: row, c: col})];
+                    const header = headers[col - range.s.c];
+                    if (cell && cell.v !== undefined && cell.v !== null && cell.v !== '') {
+                        hasData = true;
+                        rowData[header] = cell.v;
+                    } else {
+                        rowData[header] = '';
+                    }
+                }
+                if (hasData) data.push(rowData);
+            }
+            return { headers, data };
+        }
+
+        function formatDateUS(value) {
+            if (!value) return '';
+            let date;
+            if (typeof value === 'number') {
+                date = XLSX.SSF.parse_date_code(value);
+                date = new Date(date.y, date.m - 1, date.d);
+            } else if (value instanceof Date) {
+                date = value;
+            } else {
+                date = new Date(value);
+            }
+            if (isNaN(date.getTime())) return String(value);
+            return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
+        }
+
+        async function processExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const clientNameInput = document.getElementById('clientName');
+            const processBtn = document.getElementById('processBtn');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showMessage('step1Messages', 'Please select one or more Excel files', 'error');
+                return;
+            }
+            if (!clientNameInput.value.trim()) {
+                showMessage('step1Messages', 'Please enter a client identifier', 'error');
+                return;
+            }
+            
+            clientNameGlobal = clientNameInput.value.trim();
+            processBtn.disabled = true;
+            processBtn.innerHTML = '<span class="spinner"></span> Processing...';
+
+            const tempDeposits = [];
+
+            try {
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    const file = fileInput.files[i];
+                    fileNamesStore.push(file.name);
+
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+
+                    if (!workbook.SheetNames.includes(ASSET_SUMMARY_SHEET)) throw new Error(`Sheet "${ASSET_SUMMARY_SHEET}" not found in file: ${file.name}`);
+                    
+                    const assetSheet = workbook.Sheets[ASSET_SUMMARY_SHEET];
+                    const assetHeaderRow = findHeaderRow(assetSheet, ASSET_HEADER_CRITERIA);
+                    if (assetHeaderRow === null) throw new Error(`Header row not found in "${ASSET_SUMMARY_SHEET}" sheet of file: ${file.name}`);
+                    
+                    const assetResult = readSheetWithHeader(assetSheet, assetHeaderRow);
+                    const assetColsLowerMap = {};
+                    assetResult.headers.forEach(h => assetColsLowerMap[h.toLowerCase().trim()] = h);
+                    
+                    const missingCols = REQUIRED_ASSET_PDF_COLS.filter(req => !assetColsLowerMap[req.toLowerCase().trim()]);
+                    if (missingCols.length > 0) throw new Error(`Missing required columns in Asset Summary of ${file.name}: ${missingCols.join(', ')}`);
+                    
+                    assetSummaryDataStore[i] = {
+                        headers: REQUIRED_ASSET_PDF_COLS.map(req => assetColsLowerMap[req.toLowerCase().trim()]),
+                        data: assetResult.data,
+                        fileName: file.name
+                    };
+                    
+                    const accountMaskCol = assetColsLowerMap['account mask'];
+                    const accountMasks = [...new Set(assetResult.data.map(row => String(row[accountMaskCol] || '').trim()).filter(mask => mask))];
+                    
+                    const tranPattern = /^\((\d+)\)\s+(.+?)\s+tran$/i;
+                    workbook.SheetNames.forEach(sheetName => {
+                        const match = sheetName.match(tranPattern);
+                        if (match && accountMasks.includes(match[2])) {
+                            const tranSheet = workbook.Sheets[sheetName];
+                            const tranHeaderRow = findHeaderRow(tranSheet, TRANSACTION_HEADER_CRITERIA);
+                            if (tranHeaderRow !== null) {
+                                const tranResult = readSheetWithHeader(tranSheet, tranHeaderRow);
+                                const amountCol = tranResult.headers.find(h => h.toLowerCase().trim() === 'amount');
+                                if (amountCol) {
+                                    tranResult.data.forEach(row => {
+                                        const amount = parseFloat(row[amountCol]);
+                                        if (!isNaN(amount) && amount > 0) {
+                                            tempDeposits.push({
+                                                ...row,
+                                                _headers: tranResult.headers,
+                                                _Amount_Numeric: amount,
+                                                _Original_Sheet: sheetName,
+                                                _fileIndex: i,
+                                                _fileName: file.name
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                if (tempDeposits.length === 0) {
+                    showMessage('step1Messages', 'No positive transactions (deposits) found in any of the files', 'warning');
+                    processBtn.disabled = false;
+                    processBtn.innerHTML = '<span>Process Excel File(s)</span>';
+                    return;
+                }
+                
+                tempDeposits.sort((a, b) => b['_Amount_Numeric'] - a['_Amount_Numeric']);
+                allDepositsData = tempDeposits;
+                
+                displayDeposits(allDepositsData);
+                
+                document.getElementById('step2').classList.remove('hidden');
+                document.getElementById('step3').classList.remove('hidden');
+                
+                showMessage('step1Messages', `Successfully loaded ${allDepositsData.length} deposits from ${fileInput.files.length} file(s)!`, 'success');
+                
+                // *** FIX: Reset button on successful completion ***
+                processBtn.disabled = false;
+                processBtn.innerHTML = '<span>Process Excel File(s)</span>';
+                
+            } catch (error) {
+                showMessage('step1Messages', `Error: ${error.message}`, 'error');
+                resetApplication(); 
+                document.getElementById('excelFile').value = ''; 
+            }
+        }
+
+        function displayDeposits(deposits) {
+            const container = document.getElementById('depositsTableContainer');
+            if (deposits.length === 0) {
+                container.innerHTML = '<p>No deposits found</p>';
+                return;
+            }
+            
+            const displayCols = ['Date', 'Amount', 'Original description', 'Name', '_fileName'];
+            const firstDeposit = deposits[0];
+            const availableCols = displayCols.filter(col => {
+                if (col === '_fileName') return true;
+                return firstDeposit._headers.some(h => h.toLowerCase().trim() === col.toLowerCase().trim());
+            });
+            
+            let tableHTML = '<div class="deposits-table-container"><table class="deposits-table"><thead><tr>';
+            availableCols.forEach(col => {
+                const displayName = col === '_fileName' ? 'Source File' : col;
+                tableHTML += `<th>${displayName}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+            
+            deposits.forEach(deposit => {
+                tableHTML += '<tr>';
+                availableCols.forEach(col => {
+                    let value = '';
+                    if (col === '_fileName') {
+                        value = deposit['_fileName'] || '';
+                    } else {
+                        const actualCol = deposit._headers.find(h => h.toLowerCase().trim() === col.toLowerCase().trim());
+                        value = actualCol ? deposit[actualCol] : '';
+                        if (col.toLowerCase() === 'date') value = formatDateUS(value);
+                    }
+                    tableHTML += `<td>${value}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+            
+            tableHTML += '</tbody></table></div>';
+            container.innerHTML = tableHTML;
+        }
+
+        async function generatePOD() {
+            const keywordInput = document.getElementById('keywordInput');
+            const keyword = keywordInput.value.trim();
+            if (!keyword) {
+                showMessage('step3Messages', 'Please enter a keyword', 'warning');
+                return;
+            }
+            
+            try {
+                const matches = allDepositsData.filter(deposit => {
+                    const descCol = deposit._headers.find(h => h.toLowerCase().trim() === 'original description');
+                    if (!descCol) return false;
+                    return String(deposit[descCol] || '').toLowerCase().includes(keyword.toLowerCase());
+                });
+                
+                if (matches.length === 0) {
+                    showMessage('step3Messages', `No deposits found matching "${keyword}"`, 'warning');
+                    return;
+                }
+                
+                const groupedMatches = matches.reduce((acc, match) => {
+                    const key = match._fileIndex;
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(match);
+                    return acc;
+                }, {});
+
+                showMessage('step3Messages', `Found ${matches.length} deposit(s) in ${Object.keys(groupedMatches).length} file(s) matching "${keyword}"`, 'info');
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
+                let isFirstFile = true;
+
+                for (const fileIndex in groupedMatches) {
+                    if (!isFirstFile) {
+                        doc.addPage();
+                    }
+                    isFirstFile = false;
+                    
+                    let currentY = 0.5;
+                    
+                    const assetData = assetSummaryDataStore[fileIndex];
+                    const transactions = groupedMatches[fileIndex];
+                    
+                    // Asset Summary Table
+                    doc.setFontSize(14).setFont(undefined, 'normal');
+                    doc.text('Asset Summary', 0.5, currentY);
+                    currentY += 0.2;
+                    doc.autoTable({
+                        startY: currentY,
+                        head: [assetData.headers],
+                        body: assetData.data.map(row => assetData.headers.map(col => String(row[col] || ''))),
+                        styles: { fontSize: 6, cellPadding: 0.03 },
+                        headStyles: { fillColor: [102, 126, 234], fontSize: 7, fontStyle: 'bold', halign: 'center' },
+                        margin: { left: 0.5, right: 0.5 }
+                    });
+                    
+                    // Transaction Table
+                    currentY = doc.lastAutoTable.finalY + 0.3;
+                    doc.text('Proof of Deposit Transactions', 0.5, currentY);
+                    currentY += 0.2;
+                    
+                    const firstMatch = transactions[0];
+                    const colMap = {};
+                    REQUIRED_POD_PDF_COLS.forEach(reqCol => {
+                        const actualCol = firstMatch._headers.find(h => h.toLowerCase().trim() === reqCol.toLowerCase().trim());
+                        if (actualCol) colMap[reqCol] = actualCol;
+                    });
+                    const availableTranHeaders = REQUIRED_POD_PDF_COLS.filter(h => colMap[h]);
+                    const tranRows = transactions.map(row => availableTranHeaders.map(col => {
+                        let value = row[colMap[col]] || '';
+                        if (col.toLowerCase() === 'date') value = formatDateUS(value);
+                        return String(value);
+                    }));
+                    
+                    doc.autoTable({
+                        startY: currentY,
+                        head: [availableTranHeaders],
+                        body: tranRows,
+                        styles: { fontSize: 6, cellPadding: 0.03 },
+                        headStyles: { fillColor: [102, 126, 234], fontSize: 7, fontStyle: 'bold', halign: 'center' },
+                        margin: { left: 0.5, right: 0.5 }
+                    });
+                }
+                
+                const safeKeyword = keyword.replace(/[\\/*?:"<>|]/g, '').replace(/\s+/g, '_').substring(0, 30);
+                const safeClient = clientNameGlobal.replace(/[\\/*?:"<>|]/g, '').replace(/\s+/g, '_').substring(0, 50);
+                const filename = `${safeClient.toUpperCase()}_${safeKeyword.toUpperCase()}_POD_${pdfCounter}.pdf`;
+                doc.save(filename);
+                
+                const listContainer = document.getElementById('generatedPdfsList');
+                const pdfItem = document.createElement('div');
+                pdfItem.className = 'pdf-item';
+                pdfItem.innerHTML = `
+                    <div>
+                        <div class="pdf-item-name">✅ ${filename}</div>
+                        <div class="pdf-item-info">${matches.length} transaction(s) from ${Object.keys(groupedMatches).length} file(s) • Keyword: "${keyword}"</div>
+                    </div>`;
+                listContainer.prepend(pdfItem);
+                
+                pdfCounter++;
+                keywordInput.value = '';
+                showMessage('step3Messages', `PDF generated: ${filename}`, 'success');
+                
+            } catch (error) {
+                showMessage('step3Messages', `Error generating PDF: ${error.message}`, 'error');
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('keywordInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') generatePOD();
+        });
+        
+        document.getElementById('excelFile').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) resetApplication();
+        });
+
+        // --- DARK MODE LOGIC ---
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const setTheme = (theme) => {
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            darkModeToggle.checked = theme === 'dark';
+        };
+        darkModeToggle.addEventListener('change', () => setTheme(darkModeToggle.checked ? 'dark' : 'light'));
+        setTheme(localStorage.getItem('theme') || 'light');
+
+    </script>
+</body>
+</html>
