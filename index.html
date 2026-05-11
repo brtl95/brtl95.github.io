@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <style>
         :root {
             --bg-main-gradient-start: #667eea;
@@ -179,6 +180,31 @@
             margin-top: 5px;
         }
 
+        /* Agreement file input styling */
+        .agreement-input-wrapper {
+            position: relative;
+        }
+
+        .agreement-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 6px 12px;
+            background: var(--bg-status-success);
+            color: var(--text-status-success);
+            border: 1px solid var(--border-color-success);
+            border-radius: 20px;
+            font-size: 0.82em;
+            font-weight: 600;
+        }
+
+        .agreement-badge.empty {
+            background: var(--bg-status-warning);
+            color: var(--text-status-warning);
+            border-color: var(--border-color-warning);
+        }
+
         .btn {
             padding: 12px 28px;
             border: none;
@@ -298,6 +324,7 @@
             border: 1px solid var(--border-color);
         }
         .pdf-item-name { font-weight: 600; color: var(--text-primary); }
+        .pdf-item-secondary { font-weight: 600; color: var(--text-secondary); margin-top: 4px; }
         .pdf-item-info { font-size: 0.85em; color: var(--text-secondary); margin-top: 5px; }
         .hidden { display: none; }
 
@@ -351,13 +378,20 @@
                     Step 1: Upload Excel File(s)
                 </h2>
                 <div class="input-group">
-                    <label for="excelFile">Select one or more Excel files containing Asset Summary and Transaction sheets</label>
+                    <label for="excelFile">Drag & Drop one or more Plaid reports</label>
                     <input type="file" id="excelFile" accept=".xlsx,.xls" multiple>
                     <p class="input-note">Note: Selecting new file(s) will reset the application.</p>
                 </div>
                 <div class="input-group">
-                    <label for="clientName">Client Identifier (for PDF naming)</label>
+                    <label for="clientName">USER ID (for PDF naming)</label>
                     <input type="text" id="clientName" placeholder="e.g., JohnDoe">
+                </div>
+                <div class="input-group">
+                    <label for="agreementFile">CONCATENATED UCC1 ACK + REDACTED AGREEMENT + UCC3 IF APPLICABLE</label>
+                    <div class="agreement-input-wrapper">
+                        <input type="file" id="agreementFile" accept=".pdf">
+                        <div id="agreementBadge" class="agreement-badge empty">📄 No agreement selected</div>
+                    </div>
                 </div>
                 <button class="btn btn-primary" id="processBtn" onclick="processExcel()">
                     <span>Process Excel File(s)</span>
@@ -383,6 +417,7 @@
                 <div class="keyword-search">
                     <p>
                         Enter keywords to search in transaction descriptions. Each search will generate a single PDF with matching deposits, sectioned by the source file.
+                        If an agreement PDF was loaded, a second merged file (Agreement + POD) will be downloaded simultaneously.
                     </p>
                     <div class="keyword-search-input">
                         <div>
@@ -407,6 +442,7 @@
         let fileNamesStore = [];
         let clientNameGlobal = '';
         let pdfCounter = 1;
+        let agreementBytesStore = null; // stores the ArrayBuffer of the uploaded agreement PDF
 
         // Constants
         const ASSET_SUMMARY_SHEET = 'Asset Summary';
@@ -507,6 +543,27 @@
             return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
         }
 
+        // --- AGREEMENT PDF LOADING ---
+        document.getElementById('agreementFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            const badge = document.getElementById('agreementBadge');
+            if (!file) {
+                agreementBytesStore = null;
+                badge.className = 'agreement-badge empty';
+                badge.textContent = '📄 No agreement selected';
+                return;
+            }
+            try {
+                agreementBytesStore = await file.arrayBuffer();
+                badge.className = 'agreement-badge';
+                badge.textContent = `✅ ${file.name}`;
+            } catch (err) {
+                agreementBytesStore = null;
+                badge.className = 'agreement-badge empty';
+                badge.textContent = '⚠️ Could not read agreement file';
+            }
+        });
+
         async function processExcel() {
             const fileInput = document.getElementById('excelFile');
             const clientNameInput = document.getElementById('clientName');
@@ -603,7 +660,6 @@
                 
                 showMessage('step1Messages', `Successfully loaded ${allDepositsData.length} deposits from ${fileInput.files.length} file(s)!`, 'success');
                 
-                // *** FIX: Reset button on successful completion ***
                 processBtn.disabled = false;
                 processBtn.innerHTML = '<span>Process Excel File(s)</span>';
                 
@@ -655,6 +711,44 @@
             container.innerHTML = tableHTML;
         }
 
+        /**
+         * Triggers a browser download of a Uint8Array as a named file.
+         */
+        function downloadBytes(bytes, filename) {
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+
+        /**
+         * Merges an agreement PDF (ArrayBuffer) with a POD PDF (Uint8Array) using pdf-lib.
+         * Returns the merged PDF as a Uint8Array.
+         */
+        async function mergeAgreementWithPOD(agreementBuffer, podBytes) {
+            const { PDFDocument } = PDFLib;
+
+            const agreementDoc = await PDFDocument.load(agreementBuffer);
+            const podDoc = await PDFDocument.load(podBytes);
+
+            const mergedDoc = await PDFDocument.create();
+
+            // Copy agreement pages first
+            const agreementPages = await mergedDoc.copyPages(agreementDoc, agreementDoc.getPageIndices());
+            agreementPages.forEach(page => mergedDoc.addPage(page));
+
+            // Then append POD pages
+            const podPages = await mergedDoc.copyPages(podDoc, podDoc.getPageIndices());
+            podPages.forEach(page => mergedDoc.addPage(page));
+
+            return await mergedDoc.save();
+        }
+
         async function generatePOD() {
             const keywordInput = document.getElementById('keywordInput');
             const keyword = keywordInput.value.trim();
@@ -682,11 +776,23 @@
                     return acc;
                 }, {});
 
+                // Sort each group by amount descending (largest deposits first)
+                for (const fileIndex in groupedMatches) {
+                    groupedMatches[fileIndex].sort((a, b) => b['_Amount_Numeric'] - a['_Amount_Numeric']);
+                }
+
                 showMessage('step3Messages', `Found ${matches.length} deposit(s) in ${Object.keys(groupedMatches).length} file(s) matching "${keyword}"`, 'info');
                 
                 const { jsPDF } = window.jspdf;
+                // Letter landscape: 11 x 8.5 inches
+                const PAGE_HEIGHT_IN = 8.5;
+                const PAGE_BOTTOM_MARGIN = 0.5; // inches from bottom
+                const usablePageBottom = PAGE_HEIGHT_IN - PAGE_BOTTOM_MARGIN;
+
                 const doc = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
                 let isFirstFile = true;
+                let totalIncluded = 0;
+                let totalTrimmed = 0;
 
                 for (const fileIndex in groupedMatches) {
                     if (!isFirstFile) {
@@ -724,11 +830,24 @@
                         if (actualCol) colMap[reqCol] = actualCol;
                     });
                     const availableTranHeaders = REQUIRED_POD_PDF_COLS.filter(h => colMap[h]);
-                    const tranRows = transactions.map(row => availableTranHeaders.map(col => {
+                    const allTranRows = transactions.map(row => availableTranHeaders.map(col => {
                         let value = row[colMap[col]] || '';
                         if (col.toLowerCase() === 'date') value = formatDateUS(value);
                         return String(value);
                     }));
+
+                    // --- 1-PAGE CONSTRAINT ---
+                    // Estimate how many rows fit in the remaining vertical space on this page.
+                    // Row height estimate: fontSize 6pt ≈ 0.083in, cellPadding 0.03in top+bottom = 0.06in → ~0.143in/row
+                    // Header row is slightly taller due to bold/fontSize 7pt → ~0.16in
+                    const EST_ROW_HEIGHT_IN = 0.143;
+                    const EST_HEADER_HEIGHT_IN = 0.16;
+                    const remainingSpace = usablePageBottom - currentY - EST_HEADER_HEIGHT_IN;
+                    const maxRows = Math.max(1, Math.floor(remainingSpace / EST_ROW_HEIGHT_IN));
+                    const tranRows = allTranRows.slice(0, maxRows);
+
+                    totalIncluded += tranRows.length;
+                    totalTrimmed += allTranRows.length - tranRows.length;
                     
                     doc.autoTable({
                         startY: currentY,
@@ -736,28 +855,52 @@
                         body: tranRows,
                         styles: { fontSize: 6, cellPadding: 0.03 },
                         headStyles: { fillColor: [102, 126, 234], fontSize: 7, fontStyle: 'bold', halign: 'center' },
-                        margin: { left: 0.5, right: 0.5 }
+                        margin: { left: 0.5, right: 0.5 },
+                        // Prevent autoTable from adding new pages
+                        pageBreak: 'avoid',
+                        rowPageBreak: 'avoid'
                     });
                 }
                 
                 const safeKeyword = keyword.replace(/[\\/*?:"<>|]/g, '').replace(/\s+/g, '_').substring(0, 30);
                 const safeClient = clientNameGlobal.replace(/[\\/*?:"<>|]/g, '').replace(/\s+/g, '_').substring(0, 50);
-                const filename = `${safeClient.toUpperCase()}_${safeKeyword.toUpperCase()}_POD_${pdfCounter}.pdf`;
-                doc.save(filename);
+                const podFilename = `${safeClient.toUpperCase()}_${safeKeyword.toUpperCase()}_POD_${pdfCounter}.pdf`;
+                const mergedFilename = `${safeClient.toUpperCase()}_${safeKeyword.toUpperCase()}_AGREEMENT_POD_${pdfCounter}.pdf`;
+
+                // Get POD bytes without triggering a browser download yet
+                const podBytes = doc.output('arraybuffer');
+
+                // Download POD PDF
+                downloadBytes(new Uint8Array(podBytes), podFilename);
+
+                // If an agreement is loaded, merge and download combined PDF
+                let mergedDownloaded = false;
+                if (agreementBytesStore) {
+                    try {
+                        const mergedBytes = await mergeAgreementWithPOD(agreementBytesStore, new Uint8Array(podBytes));
+                        downloadBytes(mergedBytes, mergedFilename);
+                        mergedDownloaded = true;
+                    } catch (mergeErr) {
+                        showMessage('step3Messages', `POD generated, but agreement merge failed: ${mergeErr.message}`, 'warning');
+                    }
+                }
                 
+                // Update generated PDFs list
                 const listContainer = document.getElementById('generatedPdfsList');
                 const pdfItem = document.createElement('div');
                 pdfItem.className = 'pdf-item';
                 pdfItem.innerHTML = `
                     <div>
-                        <div class="pdf-item-name">✅ ${filename}</div>
-                        <div class="pdf-item-info">${matches.length} transaction(s) from ${Object.keys(groupedMatches).length} file(s) • Keyword: "${keyword}"</div>
+                        <div class="pdf-item-name">✅ ${podFilename}</div>
+                        ${mergedDownloaded ? `<div class="pdf-item-secondary">📎 ${mergedFilename}</div>` : ''}
+                        <div class="pdf-item-info">${totalIncluded} of ${matches.length} transaction(s) shown (largest first) from ${Object.keys(groupedMatches).length} file(s) • Keyword: "${keyword}"${mergedDownloaded ? ' • Includes merged agreement' : ''}</div>
                     </div>`;
                 listContainer.prepend(pdfItem);
                 
                 pdfCounter++;
                 keywordInput.value = '';
-                showMessage('step3Messages', `PDF generated: ${filename}`, 'success');
+                const trimNote = totalTrimmed > 0 ? ` (${totalTrimmed} lower-value row(s) omitted to fit 1 page)` : '';
+                showMessage('step3Messages', `PDF(s) generated: ${podFilename}${mergedDownloaded ? ` + ${mergedFilename}` : ''}${trimNote}`, 'success');
                 
             } catch (error) {
                 showMessage('step3Messages', `Error generating PDF: ${error.message}`, 'error');
