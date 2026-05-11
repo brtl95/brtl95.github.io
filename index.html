@@ -743,7 +743,7 @@
             agreementPages.forEach(page => mergedDoc.addPage(page));
 
             // Then append POD pages
-            const podPages = await mergedDoc.copyPages(podDoc, podDoc.getPageIndices());
+            const podPages = await mergedDoc.copyPages(podDoc, [0]);
             podPages.forEach(page => mergedDoc.addPage(page));
 
             return await mergedDoc.save();
