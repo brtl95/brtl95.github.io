@@ -840,8 +840,8 @@
                     // Estimate how many rows fit in the remaining vertical space on this page.
                     // Row height estimate: fontSize 6pt ≈ 0.083in, cellPadding 0.03in top+bottom = 0.06in → ~0.143in/row
                     // Header row is slightly taller due to bold/fontSize 7pt → ~0.16in
-                    const EST_ROW_HEIGHT_IN = 0.143;
-                    const EST_HEADER_HEIGHT_IN = 0.16;
+                    const EST_ROW_HEIGHT_IN = 0.155;   // slightly larger → more conservative
+                    const EST_HEADER_HEIGHT_IN = 0.20; // account for label text + header row
                     const remainingSpace = usablePageBottom - currentY - EST_HEADER_HEIGHT_IN;
                     const maxRows = Math.max(1, Math.floor(remainingSpace / EST_ROW_HEIGHT_IN));
                     const tranRows = allTranRows.slice(0, maxRows);
@@ -855,10 +855,7 @@
                         body: tranRows,
                         styles: { fontSize: 6, cellPadding: 0.03 },
                         headStyles: { fillColor: [102, 126, 234], fontSize: 7, fontStyle: 'bold', halign: 'center' },
-                        margin: { left: 0.5, right: 0.5 },
-                        // Prevent autoTable from adding new pages
-                        pageBreak: 'avoid',
-                        rowPageBreak: 'avoid'
+                        margin: { left: 0.5, right: 0.5 }
                     });
                 }
                 
